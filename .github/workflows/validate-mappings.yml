@@ -1,0 +1,52 @@
+name: Process Mappings
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+      
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        
+    - name: Install dependencies
+      run: uv sync
+        
+    - name: Run processing pipeline
+      run: |
+        uv run validate-mappings --full-pipeline
+      env:
+        # Rate limiting for external requests
+        RATE_LIMIT_DELAY: 1.0
+        
+    - name: Check for changes
+      id: verify-changed-files
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Commit changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .
+        git commit -m "🤖 Auto-process: Update mappings, remove duplicates, sort, and generate minified files"
+        git push
