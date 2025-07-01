@@ -42,6 +42,19 @@ jobs:
       run: |
         if [ -n "$(git status --porcelain)" ]; then
           echo "changed=true" >> $GITHUB_OUTPUT
+          
+          # Check if change summary exists and read commit message data
+          if [ -f "change_summary.json" ]; then
+            # Extract commit title and description from change summary
+            COMMIT_TITLE=$(python -c "import json; data=json.load(open('change_summary.json','r',encoding='utf-8')); print(data.get('commit_title', '🔄 更新映射文件'))")
+            COMMIT_DESCRIPTION=$(python -c "import json; data=json.load(open('change_summary.json','r',encoding='utf-8')); print(data.get('commit_description', '自动处理映射文件').replace('\n', '\\n'))")
+            
+            echo "commit_title=$COMMIT_TITLE" >> $GITHUB_OUTPUT  
+            echo "commit_description=$COMMIT_DESCRIPTION" >> $GITHUB_OUTPUT
+          else
+            echo "commit_title=🔄 更新映射文件" >> $GITHUB_OUTPUT
+            echo "commit_description=自动处理映射文件，未生成详细变更摘要。" >> $GITHUB_OUTPUT
+          fi
         else
           echo "changed=false" >> $GITHUB_OUTPUT
         fi
@@ -52,5 +65,11 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add .
-        git commit -m "🤖 Auto-process: Update mappings, remove duplicates, sort, and generate minified files"
+        
+        # Use dynamic commit message with title and description
+        COMMIT_TITLE="${{ steps.verify-changed-files.outputs.commit_title }}"
+        COMMIT_DESCRIPTION="${{ steps.verify-changed-files.outputs.commit_description }}"
+        
+        # Create commit with title and description
+        git commit -m "$COMMIT_TITLE" -m "$COMMIT_DESCRIPTION"
         git push origin master

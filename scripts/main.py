@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from .utils.logger import get_logger, log_progress, log_result
+from .utils.change_tracker import ChangeTracker
 from .validators.json_validator import validate_json_files
 from .validators.duplicate_remover import remove_duplicates_from_files
 from .validators.sorter import sort_mappings_files
@@ -407,6 +408,9 @@ def main():
     start_time = time.time()
     all_results = {}
     
+    # Initialize change tracker
+    change_tracker = ChangeTracker()
+    
     try:
         # Run validation pipeline
         if run_validation:
@@ -458,6 +462,14 @@ def main():
     # Summary
     end_time = time.time()
     duration = end_time - start_time
+    
+    # Export change tracking data for workflow
+    try:
+        change_data_path = args.mappings_dir / "change_summary.json"
+        change_tracker.export_to_json(change_data_path)
+        logger.info(f"变更数据已导出到: {change_data_path}")
+    except Exception as e:
+        logger.warning(f"导出变更数据失败: {e}")
     
     logger.info("=" * 60)
     logger.info("PIPELINE SUMMARY")
