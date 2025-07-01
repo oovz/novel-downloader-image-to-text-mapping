@@ -5,6 +5,10 @@ on:
     branches: [master]
   workflow_dispatch:  # Allow manual triggering
 
+permissions:
+  contents: write  # Allow workflow to push commits
+  actions: read    # Allow workflow to read action status
+
 jobs:
   process:
     runs-on: ubuntu-latest
@@ -49,4 +53,4 @@ jobs:
         git config --local user.name "GitHub Action"
         git add .
         git commit -m "🤖 Auto-process: Update mappings, remove duplicates, sort, and generate minified files"
-        git push
+        git push origin master
