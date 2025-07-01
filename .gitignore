@@ -161,7 +161,11 @@ cython_debug/
 # Project-specific ignores
 # Temporary image downloads
 temp_images/
-downloads/
+temp/
+
+# Pipeline workflow metadata
+change_summary.json
+*.temp.json
 
 # Log files
 *.log
