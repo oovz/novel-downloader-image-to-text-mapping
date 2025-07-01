@@ -56,16 +56,16 @@ class SyncProcessor:
         # Load filename mapping
         if filename_file.exists():
             filename_mapping = read_json_file(filename_file) or {}
-            logger.info(f"Loaded {len(filename_mapping)} filename mappings for {domain}")
+            logger.info(f"已加载 {domain} 的 {len(filename_mapping)} 个文件名映射")
         else:
-            logger.warning(f"Filename mapping file not found: {filename_file}")
+            logger.warning(f"未找到文件名映射文件: {filename_file}")
         
         # Load hash mapping
         if hash_file.exists():
             hash_mapping = read_json_file(hash_file) or {}
-            logger.info(f"Loaded {len(hash_mapping)} hash mappings for {domain}")
+            logger.info(f"已加载 {domain} 的 {len(hash_mapping)} 个哈希映射")
         else:
-            logger.warning(f"Hash mapping file not found: {hash_file}")
+            logger.warning(f"未找到哈希映射文件: {hash_file}")
         
         return filename_mapping, hash_mapping
     
@@ -90,10 +90,10 @@ class SyncProcessor:
         missing_characters = filename_characters - hash_characters
         
         if missing_characters:
-            logger.info(f"Found {len(missing_characters)} characters in filename mapping but not in hash mapping")
-            logger.debug(f"Missing characters: {sorted(missing_characters)}")
+            logger.info(f"发现 {len(missing_characters)} 个字符存在于文件名映射中但不在哈希映射中")
+            logger.debug(f"缺少的字符: {sorted(missing_characters)}")
         else:
-            logger.info("All characters from filename mapping exist in hash mapping")
+            logger.info("文件名映射中的所有字符都已存在于哈希映射中")
         
         return missing_characters
     
@@ -149,7 +149,7 @@ class SyncProcessor:
             result.add_error(f"No configuration found for domain: {domain}")
             return result
         
-        log_progress(f"Processing {len(char_to_filenames)} missing characters for domain {domain}")
+        log_progress(f"正在处理域 {domain} 的 {len(char_to_filenames)} 个缺失字符")
         
         # Collect all filenames to download
         all_filenames: List[str] = []
@@ -164,13 +164,13 @@ class SyncProcessor:
                 unique_filenames.append(filename)
                 seen.add(filename)
         
-        logger.info(f"Need to download {len(unique_filenames)} unique images")
+        logger.info(f"需要下载 {len(unique_filenames)} 个唯一图像文件")
         
         # Download images
         download_result = self.downloader.download_images_sync(domain, unique_filenames)
         
         if not download_result.success:
-            logger.error("Image download failed, cannot proceed with hash creation")
+            logger.error("图像下载失败，无法继续创建哈希")
             return download_result
         
         # Create hashes for successfully downloaded images
@@ -188,15 +188,23 @@ class SyncProcessor:
                         character_hash = self.hasher.hash_image_file(str(image_path))
                         if character_hash:
                             hash_results[character_hash] = character
-                            logger.debug(f"Created hash for character '{character}' from file '{filename}': {character_hash}")
+                            logger.debug(f"为字符 '{character}' 创建哈希，来源文件 '{filename}': {character_hash}")
                             break
                     except Exception as e:
-                        logger.warning(f"Failed to hash image {filename} for character '{character}': {e}")
+                        logger.warning(f"为字符 '{character}' 从文件 '{filename}' 创建哈希失败: {e}")
                         continue
             
             if character_hash is None:
                 failed_hashes.append(character)
-                logger.error(f"Failed to create hash for character '{character}' (tried {len(filenames)} files)")
+                logger.error(f"为字符 '{character}' 创建哈希失败 (尝试了 {len(filenames)} 个文件)")
+        
+        # Clean up temporary files for this domain after hash generation
+        try:
+            cleaned_count = self.downloader.cleanup_domain_files(domain)
+            if cleaned_count > 0:
+                logger.info(f"哈希生成完成后清理了 {cleaned_count} 个临时文件")
+        except Exception as e:
+            logger.warning(f"清理临时文件失败: {e}")  # Don't fail the whole process
         
         # Create result
         result = ValidationResult(success=len(failed_hashes) == 0)
@@ -281,7 +289,7 @@ class SyncProcessor:
                 'total_hashes': len(updated_mapping)
             }
             
-            logger.info(f"Updated hash mapping: {len(existing_mapping)} -> {len(updated_mapping)} entries")
+            logger.info(f"更新哈希映射: {len(existing_mapping)} -> {len(updated_mapping)} 条目")
             return result
             
         except Exception as e:
@@ -300,14 +308,14 @@ class SyncProcessor:
         Returns:
             ValidationResult with synchronization statistics
         """
-        log_progress(f"Starting synchronization for domain: {domain}")
+        log_progress(f"开始同步域: {domain}")
         
         # Load mappings
         try:
             filename_mapping, hash_mapping = self.load_mappings(domain, mappings_dir)
         except Exception as e:
             result = ValidationResult(success=False)
-            result.add_error(f"Failed to load mappings for domain {domain}: {e}")
+            result.add_error(f"为域 {domain} 加载映射失败: {e}")
             return result
         
         # Find missing characters
@@ -317,7 +325,7 @@ class SyncProcessor:
             result = ValidationResult(success=True)
             result.details = {
                 'domain': domain,
-                'message': 'All characters from filename mapping exist in hash mapping',
+                'message': '文件名映射中的所有字符都已存在于哈希映射中',
                 'filename_entries': len(filename_mapping),
                 'hash_entries': len(hash_mapping)
             }
@@ -358,7 +366,7 @@ class SyncProcessor:
         
         if len(new_hashes) < len(missing_characters):
             failed_count = len(missing_characters) - len(new_hashes)
-            result.add_warning(f"Failed to create hashes for {failed_count} characters")
+            result.add_warning(f"为 {failed_count} 个字符创建哈希失败")
         
         log_result(f"Sync for {domain}", result)
         return result
@@ -409,7 +417,7 @@ class SyncProcessor:
         successful = sum(1 for r in results.values() if r.success)
         total = len(results)
         
-        logger.info(f"Synchronization completed: {successful}/{total} domains successful")
+        logger.info(f"同步完成: {successful}/{total} 个域成功")
         
         return results
 
